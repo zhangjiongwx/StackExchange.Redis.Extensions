@@ -35,7 +35,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			}
 
 			keyprefix = keyPrefix;
-		}
+        }
 
 		public IDatabase Database { get; }
 
@@ -58,7 +58,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 		public Task<bool> RemoveAsync(string key, CommandFlags flags = CommandFlags.None)
 		{
-			return Database.KeyDeleteAsync(key, flags);
+            return Database.KeyDeleteAsync(key, flags);
 		}
 
 		public void RemoveAll(IEnumerable<string> keys, CommandFlags flags = CommandFlags.None)
@@ -88,7 +88,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			var result = Get<T>(key, flag);
 
 			if (!Equals(result, default(T)))
-				Database.KeyExpire(key, expiresAt.Subtract(DateTime.Now));
+				Database.KeyExpire(key, expiresAt.UtcDateTime.Subtract(DateTime.UtcNow));
 
 			return result;
 		}
@@ -110,7 +110,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			if (!valueBytes.HasValue)
 				return default;
 
-			return await Serializer.DeserializeAsync<T>(valueBytes);
+            return Serializer.Deserialize<T>(valueBytes);
 		}
 
 		public async Task<T> GetAsync<T>(string key, DateTimeOffset expiresAt, CommandFlags flag = CommandFlags.None)
@@ -118,7 +118,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			var result = await GetAsync<T>(key, flag);
 
 			if (!Equals(result, default(T)))
-				await Database.KeyExpireAsync(key, expiresAt.Subtract(DateTime.Now));
+				await Database.KeyExpireAsync(key, expiresAt.UtcDateTime.Subtract(DateTime.UtcNow));
 
 			return default;
 		}
@@ -142,7 +142,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 		public async Task<bool> AddAsync<T>(string key, T value, When when = When.Always, CommandFlags flag = CommandFlags.None)
 		{
-			var entryBytes = await Serializer.SerializeAsync(value);
+			var entryBytes = Serializer.Serialize(value);
 
 			return await Database.StringSetAsync(key, entryBytes, null, when, flag);
 		}
@@ -160,15 +160,15 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 		public bool Add<T>(string key, T value, DateTimeOffset expiresAt, When when = When.Always, CommandFlags flag = CommandFlags.None)
 		{
 			var entryBytes = Serializer.Serialize(value);
-			var expiration = expiresAt.Subtract(DateTimeOffset.Now);
+			var expiration = expiresAt.UtcDateTime.Subtract(DateTime.UtcNow);
 
 			return Database.StringSet(key, entryBytes, expiration,when, flag);
 		}
 
 		public async Task<bool> AddAsync<T>(string key, T value, DateTimeOffset expiresAt, When when = When.Always, CommandFlags flag = CommandFlags.None)
 		{
-			var entryBytes = await Serializer.SerializeAsync(value);
-			var expiration = expiresAt.Subtract(DateTimeOffset.Now);
+			var entryBytes = Serializer.Serialize(value);
+			var expiration = expiresAt.UtcDateTime.Subtract(DateTime.UtcNow);
 
 			return await Database.StringSetAsync(key, entryBytes, expiration, when, flag);
 		}
@@ -192,7 +192,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 		public async Task<bool> AddAsync<T>(string key, T value, TimeSpan expiresIn, When when = When.Always, CommandFlags flag = CommandFlags.None)
 		{
-			var entryBytes = await Serializer.SerializeAsync(value);
+			var entryBytes = Serializer.Serialize(value);
 
 			return await Database.StringSetAsync(key, entryBytes, expiresIn, when, flag);
 		}
@@ -291,7 +291,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			var result = Database.StringSet(values, when, flag);
 
 			foreach (var value in values)
-				Database.KeyExpire(value.Key, expiresAt.DateTime, flag);
+				Database.KeyExpire(value.Key, expiresAt.UtcDateTime, flag);
 
 			return result;
 		}
@@ -304,7 +304,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 			var result = await Database.StringSetAsync(values, when, flag);
 
-			Parallel.ForEach(values, async value => await Database.KeyExpireAsync(value.Key, expiresAt.DateTime, flag));
+			Parallel.ForEach(values, async value => await Database.KeyExpireAsync(value.Key, expiresAt.UtcDateTime, flag));
 
 			return result;
 		}
@@ -355,7 +355,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 			if (item == null) throw new ArgumentNullException(nameof(item), "item cannot be null.");
 
-			var serializedObject = await Serializer.SerializeAsync(item);
+			var serializedObject = Serializer.Serialize(item);
 
 			return await Database.SetAddAsync(key, serializedObject, flag);
 		}
@@ -402,7 +402,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 			if (item == null) throw new ArgumentNullException(nameof(item), "item cannot be null.");
 
-			var serializedObject = await Serializer.SerializeAsync(item);
+			var serializedObject = Serializer.Serialize(item);
 
 			return await Database.SetRemoveAsync(key, serializedObject, flag);
 		}
@@ -554,7 +554,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 		public async Task<long> PublishAsync<T>(RedisChannel channel, T message, CommandFlags flags = CommandFlags.None)
 		{
 			var sub = connectionMultiplexer.GetSubscriber();
-			return await sub.PublishAsync(channel, await Serializer.SerializeAsync(message), flags);
+			return await sub.PublishAsync(channel, Serializer.Serialize(message), flags);
 		}
 
 		public void Subscribe<T>(RedisChannel channel, Action<T> handler, CommandFlags flags = CommandFlags.None)
@@ -627,7 +627,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			if (item == null)
 				throw new ArgumentNullException(nameof(item), "item cannot be null.");
 
-			var serializedItem = await Serializer.SerializeAsync(item);
+			var serializedItem = Serializer.Serialize(item);
 
 			return await Database.ListLeftPushAsync(key, serializedItem, when, flags);
 		}
@@ -650,7 +650,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 			if (item == RedisValue.Null) return null;
 
-			return item == RedisValue.Null ? null : await Serializer.DeserializeAsync<T>(item);
+			return item == RedisValue.Null ? null : Serializer.Deserialize<T>(item);
 		}
 
 		public bool HashDelete(string hashKey, string key, CommandFlags commandFlags = CommandFlags.None)
@@ -824,7 +824,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 		public bool UpdateExpiry(string key, DateTimeOffset expiresAt, CommandFlags flags = CommandFlags.None)
 		{
 			if (Database.KeyExists(key))
-				return Database.KeyExpire(key, expiresAt.Subtract(DateTime.Now), flags);
+				return Database.KeyExpire(key, expiresAt.UtcDateTime.Subtract(DateTime.UtcNow), flags);
 
 			return false;
 		}
@@ -840,7 +840,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 		public async Task<bool> UpdateExpiryAsync(string key, DateTimeOffset expiresAt, CommandFlags flags = CommandFlags.None)
 		{
 			if (await Database.KeyExistsAsync(key))
-				return await Database.KeyExpireAsync(key, expiresAt.Subtract(DateTime.Now), flags);
+				return await Database.KeyExpireAsync(key, expiresAt.UtcDateTime.Subtract(DateTime.UtcNow), flags);
 
 			return false;
 		}
@@ -858,7 +858,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			var results = new Dictionary<string, bool>(StringComparer.Ordinal);
 			
 			for (var i = 0; i < keys.Length; i++)
-				results.Add(keys[i], UpdateExpiry(keys[i], expiresAt, flags));
+				results.Add(keys[i], UpdateExpiry(keys[i], expiresAt.UtcDateTime, flags));
 			
 			return results;
 		}
@@ -878,7 +878,7 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 			var results = new Dictionary<string, bool>(StringComparer.Ordinal);
 			
 			for (var i = 0; i < keys.Length; i++)
-				results.Add(keys[i], await UpdateExpiryAsync(keys[i], expiresAt, flags));
+				results.Add(keys[i], await UpdateExpiryAsync(keys[i], expiresAt.UtcDateTime, flags));
 			
 			return results;
 		}
@@ -963,5 +963,43 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 
 			return data;
 		}
-	}
+        /// <summary>
+        ///     Add  the entry to a sorted set with  an incremen score 
+        /// </summary>
+        /// <remarks>
+        ///     Time complexity: O(1)
+        /// </remarks>
+        /// <param name="key">Key of the set</param>
+        /// <param name="value">The instance of T.</param>
+        /// <param name="score">Score of the entry</param>
+        /// <param name="commandFlags">Command execution flags</param>
+        /// <returns>
+        ///      if the object has been added return previous score. Otherwise return 0.0 when first add
+        /// </returns>
+        public double SortedSetAddIncrement<T>(string key, T value, double score, CommandFlags commandFlags = CommandFlags.None)
+        {
+            var entryBytes = Serializer.Serialize(value);
+            return Database.SortedSetIncrement(key, entryBytes, score, commandFlags);
+        }
+
+        /// <summary>
+        ///     Add  the entry to a sorted set with  an incremen score 
+        /// </summary>
+        /// <remarks>
+        ///     Time complexity: O(1)
+        /// </remarks>
+        /// <param name="key">Key of the set</param>
+        /// <param name="value">The instance of T.</param>
+        /// <param name="score">Score of the entry</param>
+        /// <param name="commandFlags">Command execution flags</param>
+        /// <returns>
+        ///      if the object has been added return previous score. Otherwise return 0.0 when first add
+        /// </returns>
+        /// 
+        public async Task<double> SortedSetAddIncrementAsync<T>(string key, T value, double score, CommandFlags commandFlags = CommandFlags.None)
+        {
+            var entryBytes = Serializer.Serialize(value);
+            return await Database.SortedSetIncrementAsync(key, entryBytes, score, commandFlags);
+        }
+    }
 }

@@ -8,7 +8,6 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 {
 	public class RedisCacheConnectionPoolManager : IRedisCacheConnectionPoolManager
 	{
-		private const int POOL_SIZE = 10;
 		private static ConcurrentBag<Lazy<ConnectionMultiplexer>> connections;
 		private readonly RedisConfiguration redisConfiguration;
 
@@ -31,33 +30,28 @@ namespace StackExchange.Redis.Extensions.Core.Implementations
 		}
 
 		public IConnectionMultiplexer GetConnection()
-		{
-			Lazy<ConnectionMultiplexer> response;
-
-			var loadedLazys = connections.Where(lazy => lazy.IsValueCreated);
-
-			if (loadedLazys.Count() == connections.Count)
-			{
-				var minValue = connections.Min(lazy => lazy.Value.GetCounters().TotalOutstanding);
-				response = connections.First(lazy => lazy.Value.GetCounters().TotalOutstanding == minValue);
-			}
-			else
-			{
-				response = connections.First(lazy => !lazy.IsValueCreated);
-			}
-
-			return response.Value;
-		}
+        {
+            Lazy<ConnectionMultiplexer> response;
+	        var loadedLazys = connections.Where(lazy => lazy.IsValueCreated);
+	        
+            if (loadedLazys.Count() == connections.Count) {
+		        response = connections.OrderBy(x=>x.Value.GetCounters().TotalOutstanding).First();
+	        }
+	        else {
+		        response = connections.First(lazy => !lazy.IsValueCreated);
+	        }
+	        
+            return response.Value;
+        }
 
 		private void Initialize()
 		{
 			connections = new ConcurrentBag<Lazy<ConnectionMultiplexer>>();
 
-			for (int i = 0; i < POOL_SIZE; i++)
+			for (int i = 0; i < redisConfiguration.PoolSize; i++)
 			{
 				connections.Add(new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(redisConfiguration.ConfigurationOptions)));
 			}
 		}
-
 	}
 }

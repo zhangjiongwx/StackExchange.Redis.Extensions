@@ -1,4 +1,5 @@
-﻿using System.Net.Security;
+﻿using System.Collections.Generic;
+using System.Net.Security;
 
 namespace StackExchange.Redis.Extensions.Core.Configuration
 {
@@ -16,6 +17,8 @@ namespace StackExchange.Redis.Extensions.Core.Configuration
         private int database = 0;
         private RedisHost[] hosts;
         private ServerEnumerationStrategy serverEnumerationStrategy;
+        private int poolSize = 5;
+	    private string[] excludeCommands;
 
         /// <summary>
         /// The key separation prefix used for all cache entries
@@ -160,6 +163,32 @@ namespace StackExchange.Redis.Extensions.Core.Configuration
         }
 
         /// <summary>
+        /// Redis connections pool size
+        /// </summary>
+        public int PoolSize
+        {
+            get => poolSize;
+            set
+            {
+                poolSize = value;
+                ResetConfigurationOptions();
+            }
+        }
+		
+        /// <summary>
+        /// Exclude commands
+        /// </summary>
+        public string[] ExcludeCommands
+        {
+            get => excludeCommands;
+            set
+            {
+                excludeCommands = value;
+                ResetConfigurationOptions();
+            }
+        }
+
+        /// <summary>
         /// A RemoteCertificateValidationCallback delegate responsible for validating the certificate supplied by the remote party; note
         /// that this cannot be specified in the configuration-string.
         /// </summary>
@@ -178,8 +207,16 @@ namespace StackExchange.Redis.Extensions.Core.Configuration
 						Password = Password,
 						ConnectTimeout = ConnectTimeout,
 						SyncTimeout = SyncTimeout,
-						AbortOnConnectFail = AbortOnConnectFail
+						AbortOnConnectFail = AbortOnConnectFail,
 					};
+					
+					if (ExcludeCommands != null)
+					{
+						options.CommandMap = CommandMap.Create(
+							new HashSet<string>(ExcludeCommands),
+							available: false
+						);
+					}
 
 					foreach (var redisHost in Hosts)
 						options.EndPoints.Add(redisHost.Host, redisHost.Port);
