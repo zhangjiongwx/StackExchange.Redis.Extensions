@@ -70,7 +70,17 @@ namespace StackExchange.Redis.Extensions.Tests
 			Assert.Equal("6379", response["tcp_port"]);
 		}
 
-		[Fact]
+        [Fact]
+        public async Task Info_Category_Should_Return_Valid_Information()
+        {
+            var response = await Sut.GetDbFromConfiguration().GetInfoCategorizedAsync();
+
+            Assert.NotNull(response);
+            Assert.True(response.Any());
+            Assert.Equal("6379", response.SingleOrDefault(x=> x.Key == "tcp_port").InfoValue);
+        }
+
+        [Fact]
 		public async Task Add_Item_To_Redis_Database()
 		{
 			var added = await Sut.GetDbFromConfiguration().AddAsync("my Key", "my value");
@@ -211,7 +221,25 @@ namespace StackExchange.Redis.Extensions.Tests
 			Assert.True(keys.Count() == 2);
 		}
 
-	    [Fact]
+        [Fact]
+        public async Task SearchKeys_With_Start_Should_Return_All_Keys()
+        {
+            var values = Range(0, 10)
+                .Select(i => new TestClass<string>($"mykey{i}", Guid.NewGuid().ToString()))
+                .ToArray();
+
+            foreach (var x in values)
+            {
+                await Db.StringSetAsync(x.Key, x.Value);
+            }
+
+            var result = (await Sut.GetDbFromConfiguration().SearchKeysAsync("*")).OrderBy(k => k).ToList();
+
+            Assert.True(result.Count == 10);
+        }
+
+
+        [Fact]
 	    public async Task SearchKeys_With_Key_Prefix_Should_Return_Keys_Without_Prefix()
 	    {
 	        var values = Range(0, 10)
